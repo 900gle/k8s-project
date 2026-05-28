@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: api
+  management:
+    endpoints:
+      web:
+        exposure:
+          include:
+            health,info
+      health:
+        probes:
+          enabled: true
+        livenessstate:
+          enabled: true
+        readinessstate:
+          enabled: true
