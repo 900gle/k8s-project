@@ -6,6 +6,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 public class GameController {
 
+    @GetMapping("/login")
+    public String login() {
+        return "forward:/login.html";
+    }
+
     @GetMapping("/horse")
     public String horse() {
         return "forward:/games/horse.html";

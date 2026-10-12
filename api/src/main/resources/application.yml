@@ -21,3 +21,6 @@ spring:
           enabled: true
         readinessstate:
           enabled: true
+server:
+  error:
+    include-message: always

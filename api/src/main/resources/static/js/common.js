@@ -35,6 +35,7 @@ async function api(path, body) {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(body),
     });
+    if (res.status === 401) { location.href = '/login'; throw new Error('unauthorized'); }
     if (!res.ok) throw new Error(path + ' ' + res.status);
     return res.json();
 }
@@ -68,8 +69,9 @@ function mount(key) {
     document.body.insertAdjacentHTML('afterbegin', `
         <header>
             <h1 id="home" title="5AMSUNG"><span class="logo">5AMSUNG</span></h1>
-            <div class="points">포인트 <span id="pts">${points}</span>
+            <div class="points"><span class="user" id="user"></span>포인트 <span id="pts">${points}</span>
                 <button class="ghost" id="reset">초기화</button>
+                <button class="ghost" id="logout">로그아웃</button>
             </div>
         </header>
         <section class="score" id="score"></section>
@@ -77,7 +79,9 @@ function mount(key) {
     app = $('#app');
     $('#home').onclick = () => { location.href = '/'; };
     $('#reset').onclick = () => api('/reset', {}).then(applyState).catch(console.error);
+    $('#logout').onclick = () => fetch('/api/auth/logout', {method: 'POST'}).finally(() => { location.href = '/login'; });
     renderScore();
+    fetch('/api/auth/me').then(r => r.ok ? r.json() : null).then(me => { if (me) $('#user').textContent = me.username + ' 님'; }).catch(() => {});
     api('/state').then(applyState).catch(console.error);
 }
 

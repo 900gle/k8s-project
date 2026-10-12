@@ -68,10 +68,11 @@ curl http://localhost:8080/actuator/health
 
 ## 게임장 (5AMSUNG)
 
-루트(`/`)는 경마, 사다리타기, 홀짝, 가위바위보를 고를 수 있는 게임장 화면입니다. 가상 포인트로만 즐기며, 포인트와 게임별 누적 전적은 MySQL에 저장됩니다.
+루트(`/`)는 경마, 사다리타기, 홀짝, 가위바위보를 고를 수 있는 게임장 화면입니다. 가상 포인트로만 즐기며, 회원가입 후 로그인해서 이용합니다. 포인트와 게임별 누적 전적은 사용자별로 MySQL에 저장됩니다.
 
 | 경로 | 게임 | 배당 |
 | --- | --- | --- |
+| `/login` | 로그인 / 회원가입 | - |
 | `/horse` | 경마 | 맞히면 +2배 |
 | `/ladder` | 사다리타기 | 맞히면 +2배 |
 | `/oddeven` | 홀짝 | 1배 |
@@ -81,17 +82,18 @@ curl http://localhost:8080/actuator/health
 
 ```
 index.html                  # 로비
+login.html                  # 로그인 / 회원가입
 games/*.html                # 게임별 페이지 (GameController가 /horse 등으로 forward)
 css/style.css               # 공통 스타일
 js/common.js                # 포인트/전적, 상단 헤더, 베팅 처리, API 호출
-js/{lobby,horse,ladder,oddeven,rps}.js
+js/{lobby,login,horse,ladder,oddeven,rps}.js
 ```
 
 게임 판정은 브라우저에서 하고, 서버는 결과를 검증해 DB에 저장합니다.
 
 ## DB (MySQL)
 
-포인트와 전적을 저장하기 위해 MySQL을 사용합니다. 사용자 구분 없이 지갑이 하나(`id = 1`)이며, 접속한 모두가 같은 포인트를 공유합니다.
+회원 정보, 로그인 세션, 포인트, 전적을 저장하기 위해 MySQL을 사용합니다. 포인트와 전적은 사용자별로 따로 관리합니다.
 
 ### DB / 계정 준비 (최초 1회)
 
@@ -112,30 +114,50 @@ GRANT ALL PRIVILEGES ON game.* TO 'game'@'%';
 앱이 시작될 때 `api/src/main/resources/schema.sql`이 자동으로 실행되며(`spring.sql.init.mode=always`), 이미 있으면 건너뜁니다. 직접 만들려면 아래 SQL을 실행하세요.
 
 ```sql
--- 포인트 (단일 지갑, id = 1)
-CREATE TABLE IF NOT EXISTS wallet (
-    id     INT PRIMARY KEY,
-    points INT NOT NULL
+-- 회원
+CREATE TABLE IF NOT EXISTS users (
+    id            BIGINT AUTO_INCREMENT PRIMARY KEY,
+    username      VARCHAR(30)  NOT NULL UNIQUE,
+    password_hash VARCHAR(100) NOT NULL,           -- BCrypt
+    created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-INSERT IGNORE INTO wallet (id, points) VALUES (1, 1000);
+-- 로그인 세션 (Pod가 여러 개라 DB에 보관). 쿠키 값의 SHA-256 해시만 저장
+CREATE TABLE IF NOT EXISTS user_session (
+    token_hash CHAR(64)   PRIMARY KEY,
+    user_id    BIGINT     NOT NULL,
+    expires_at TIMESTAMP  NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+);
 
--- 게임별 누적 전적
+-- 사용자별 포인트
+CREATE TABLE IF NOT EXISTS wallet (
+    user_id BIGINT PRIMARY KEY,
+    points  INT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+);
+
+-- 사용자별, 게임별 누적 전적
 CREATE TABLE IF NOT EXISTS game_stat (
-    game   VARCHAR(20) PRIMARY KEY,   -- horse / ladder / oddeven / rps
-    wins   INT NOT NULL DEFAULT 0,
-    losses INT NOT NULL DEFAULT 0,
-    draws  INT NOT NULL DEFAULT 0,
-    net    INT NOT NULL DEFAULT 0     -- 누적 손익(P)
+    user_id BIGINT      NOT NULL,
+    game    VARCHAR(20) NOT NULL,                  -- horse / ladder / oddeven / rps
+    wins    INT NOT NULL DEFAULT 0,
+    losses  INT NOT NULL DEFAULT 0,
+    draws   INT NOT NULL DEFAULT 0,
+    net     INT NOT NULL DEFAULT 0,                -- 누적 손익(P)
+    PRIMARY KEY (user_id, game),
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
 
 -- 판마다 쌓는 게임 이력
 CREATE TABLE IF NOT EXISTS game_log (
     id         BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id    BIGINT      NOT NULL,
     game       VARCHAR(20) NOT NULL,
-    outcome    CHAR(1)     NOT NULL,  -- w(승) / l(패) / d(무)
-    delta      INT         NOT NULL,  -- 포인트 변동
-    created_at TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
+    outcome    CHAR(1)     NOT NULL,               -- w(승) / l(패) / d(무)
+    delta      INT         NOT NULL,               -- 포인트 변동
+    created_at TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
 ```
 
@@ -150,13 +172,28 @@ CREATE TABLE IF NOT EXISTS game_log (
 
 > `02-secret.yaml`의 값은 로컬 테스트용입니다. 실제 자격 증명은 커밋하지 마세요.
 
+### 회원가입 / 로그인
+
+- 아이디는 3~20자(한글, 영문, 숫자, `_`), 비밀번호는 6자 이상(72바이트 이하)입니다.
+- 비밀번호는 BCrypt 해시로만 저장합니다.
+- 로그인하면 `SESSION` 쿠키(`HttpOnly`, `SameSite=Lax`, 7일)를 발급합니다. 쿠키 값의 SHA-256 해시만 `user_session`에 저장합니다.
+  Pod가 여러 개라서 메모리 세션 대신 DB에 세션을 둡니다.
+- 로그인하지 않고 `/api/state` 등을 호출하면 401이며, 화면은 `/login`으로 이동합니다.
+- 가입하면 시작 포인트 1000P 지갑이 만들어집니다.
+
+> 기존(로그인 도입 전) 단일 지갑 데이터는 `legacy_wallet`, `legacy_game_stat`, `legacy_game_log` 테이블로 이름만 바꿔 남겨 두었습니다. 필요 없으면 삭제해도 됩니다.
+
 ### API
 
 | 메서드 | 경로 | 설명 |
 | --- | --- | --- |
-| GET | `/api/state` | 포인트와 게임별 전적 조회 |
-| POST | `/api/result` | 게임 결과 저장 `{"game":"horse","outcome":"w","delta":200}` |
-| POST | `/api/reset` | 포인트 1000, 전적 초기화 (`game_log`는 유지) |
+| POST | `/api/auth/signup` | 회원가입 후 로그인 `{"username":"...","password":"..."}` (중복 아이디 409) |
+| POST | `/api/auth/login` | 로그인 (실패 401) |
+| POST | `/api/auth/logout` | 로그아웃 |
+| GET | `/api/auth/me` | 로그인한 사용자 조회 (미로그인 401) |
+| GET | `/api/state` | 내 포인트와 게임별 전적 조회 (로그인 필요) |
+| POST | `/api/result` | 게임 결과 저장 `{"game":"horse","outcome":"w","delta":200}` (로그인 필요) |
+| POST | `/api/reset` | 내 포인트 1000, 전적 초기화 (`game_log`는 유지) |
 
 `/api/result`는 없는 게임, 결과와 맞지 않는 변동값, 보유 포인트를 넘는 손실이면 400을 반환합니다.
 

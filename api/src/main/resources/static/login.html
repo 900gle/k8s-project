@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>로그인 - 5AMSUNG</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<main id="auth">
+    <div class="hero"><span class="logo">5AMSUNG</span><p>로그인하고 게임을 시작하세요</p></div>
+    <div class="panel auth-box">
+        <div class="tabs">
+            <button class="ghost sel" data-mode="login">로그인</button>
+            <button class="ghost" data-mode="signup">회원가입</button>
+        </div>
+        <form id="form" autocomplete="on">
+            <label>아이디
+                <input type="text" id="username" name="username" autocomplete="username" required minlength="3" maxlength="20">
+            </label>
+            <label>비밀번호
+                <input type="password" id="password" name="password" autocomplete="current-password" required minlength="6">
+            </label>
+            <label id="confirm-row" hidden>비밀번호 확인
+                <input type="password" id="confirm" autocomplete="new-password">
+            </label>
+            <button type="submit" id="submit">로그인</button>
+            <div class="result" id="msg"></div>
+        </form>
+        <p class="hint" id="hint">아이디 3~20자(한글·영문·숫자·_), 비밀번호 6자 이상</p>
+    </div>
+</main>
+<script src="/js/login.js"></script>
+</body>
+</html>
