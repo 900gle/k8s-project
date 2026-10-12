@@ -22,6 +22,14 @@
         header h1 { margin: 0; font-size: 20px; cursor: pointer; }
         .points { font-weight: 700; color: var(--accent); }
         .points button { margin-left: 8px; font-size: 12px; padding: 4px 8px; }
+        .score {
+            display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+            padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--card);
+            position: sticky; top: 0; z-index: 10;
+        }
+        .score .item { font-size: 13px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; white-space: nowrap; }
+        .score .item.cur { border-color: var(--accent); }
+        .score .net { font-weight: 700; }
         main { max-width: 760px; margin: 0 auto; padding: 24px 16px; }
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; }
         .tile {
@@ -67,6 +75,7 @@
         <button class="ghost" id="reset">초기화</button>
     </div>
 </header>
+<section class="score" id="score"></section>
 <main id="app"></main>
 
 <script>
@@ -86,7 +95,28 @@
         $('#pts').textContent = v;
     }
     setPoints(points);
-    $('#reset').onclick = () => setPoints(START);
+
+    // 게임별 누적 전적: { horse: {w, l, d, net}, ... }
+    let stats = {};
+    try { stats = JSON.parse(localStorage.getItem('stats') || '{}'); } catch (e) { stats = {}; }
+    let current = null;
+    function record(game, outcome, delta) {
+        const s = stats[game] || (stats[game] = {w: 0, l: 0, d: 0, net: 0});
+        s[outcome]++;
+        s.net += delta;
+        localStorage.setItem('stats', JSON.stringify(stats));
+        renderScore();
+    }
+    function renderScore() {
+        $('#score').innerHTML = Object.entries(games).map(([k, g]) => {
+            const s = stats[k] || {w: 0, l: 0, d: 0, net: 0};
+            const cls = s.net > 0 ? 'win' : s.net < 0 ? 'lose' : '';
+            return `<span class="item ${k === current ? 'cur' : ''}">${g.icon} ${g.name} ` +
+                `${s.w}승 ${s.l}패${k === 'rps' ? ` ${s.d}무` : ''} ` +
+                `<span class="net ${cls}">${s.net > 0 ? '+' : ''}${s.net}P</span></span>`;
+        }).join('');
+    }
+    $('#reset').onclick = () => { setPoints(START); stats = {}; localStorage.removeItem('stats'); renderScore(); };
     $('#home').onclick = () => show('lobby');
 
     // 베팅 UI: 금액 입력 + 검증. 유효하면 금액, 아니면 null
@@ -99,6 +129,7 @@
     }
     function settle(resultEl, win, bet, msg) {
         setPoints(points + (win ? bet : -bet));
+        record(current, win ? 'w' : 'l', win ? bet : -bet);
         resultEl.className = 'result ' + (win ? 'win' : 'lose');
         resultEl.textContent = `${msg} ${win ? '+' : '-'}${bet}P`;
     }
@@ -111,6 +142,8 @@
     };
 
     function show(name) {
+        current = name === 'lobby' ? null : name;
+        renderScore();
         app.innerHTML = '';
         (name === 'lobby' ? lobby : views[name])();
     }
@@ -290,7 +323,7 @@
                 const cpu = rnd(3);
                 $('#vs').textContent = `${hands[me]} vs ${hands[cpu]}`;
                 const diff = (me - cpu + 3) % 3; // 0 무, 1 승, 2 패
-                if (diff === 0) { res.className = 'result'; res.textContent = '비겼습니다.'; }
+                if (diff === 0) { res.className = 'result'; res.textContent = '비겼습니다.'; record('rps', 'd', 0); }
                 else settle(res, diff === 1, bet, diff === 1 ? '이겼습니다!' : '졌습니다.');
                 document.querySelectorAll('[data-h]').forEach(x => x.disabled = false);
             });
