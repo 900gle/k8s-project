@@ -1,0 +1,68 @@
+:root {
+    --bg: #0f172a; --card: #1e293b; --line: #334155;
+    --text: #e2e8f0; --muted: #94a3b8; --accent: #f59e0b; --ok: #22c55e; --bad: #ef4444;
+}
+* { box-sizing: border-box; }
+body {
+    margin: 0; min-height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg); color: var(--text);
+}
+header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 20px; border-bottom: 1px solid var(--line);
+}
+header h1 { margin: 0; font-size: 20px; cursor: pointer; }
+.points { font-weight: 700; color: var(--accent); }
+.points button { margin-left: 8px; font-size: 12px; padding: 4px 8px; }
+.score {
+    display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+    padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--card);
+    position: sticky; top: 0; z-index: 10;
+}
+.score .item { font-size: 13px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; white-space: nowrap; }
+.score .item.cur { border-color: var(--accent); }
+.score .net { font-weight: 700; }
+main { max-width: 760px; margin: 0 auto; padding: 24px 16px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; }
+.tile {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 28px 12px; text-align: center; cursor: pointer; transition: transform .1s, border-color .1s;
+}
+.tile:hover { transform: translateY(-3px); border-color: var(--accent); }
+.tile .icon { font-size: 44px; }
+.tile .name { margin-top: 8px; font-weight: 700; }
+.tile .desc { margin-top: 4px; font-size: 12px; color: var(--muted); }
+.panel { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+.panel h2 { margin: 0 0 16px; }
+button {
+    background: var(--accent); color: #111; border: 0; border-radius: 8px;
+    padding: 10px 16px; font-weight: 700; cursor: pointer; font-size: 14px;
+}
+button:disabled { opacity: .4; cursor: default; }
+button.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
+button.sel { outline: 3px solid var(--ok); }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 12px 0; }
+input[type=number] {
+    width: 90px; padding: 8px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--text);
+}
+.result { margin-top: 14px; min-height: 24px; font-weight: 700; font-size: 16px; }
+.win { color: var(--ok); } .lose { color: var(--bad); }
+.back { margin-bottom: 12px; }
+/* 경마 */
+a.tile { display: block; color: inherit; text-decoration: none; }
+.lobby-note { color: var(--muted); text-align: center; margin-top: 24px; }
+
+/* 5AMSUNG 로고: 파란 타원 + 흰색 와이드 워드마크 */
+.logo {
+    display: inline-block; background: #1428a0; color: #fff;
+    font-family: "Arial Black", "Helvetica Neue", Arial, sans-serif; font-weight: 900;
+    letter-spacing: .14em; text-indent: .14em; line-height: 1; text-transform: uppercase;
+    padding: .55em 1.5em; border-radius: 50%;
+    box-shadow: 0 2px 10px rgba(20, 40, 160, .5);
+}
+header .logo { font-size: 14px; }
+.hero { text-align: center; margin: 8px 0 32px; }
+.hero .logo { font-size: 34px; }
+.hero p { margin: 14px 0 0; color: var(--muted); }
