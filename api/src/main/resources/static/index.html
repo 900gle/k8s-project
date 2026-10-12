@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Welcome - API</title>
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #f5f7fa;
+            color: #222;
+        }
+        main {
+            text-align: center;
+            padding: 48px;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, .08);
+        }
+        h1 { margin: 0 0 12px; }
+        p { margin: 0 0 24px; color: #555; }
+        a { color: #2563eb; text-decoration: none; margin: 0 8px; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+<main>
+    <h1>Welcome 👋</h1>
+    <p>API 서버가 정상적으로 실행 중입니다.</p>
+    <nav>
+        <a href="/actuator/health">Health</a>
+        <a href="/actuator/info">Info</a>
+    </nav>
+</main>
+</body>
+</html>
