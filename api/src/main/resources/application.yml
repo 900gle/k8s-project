@@ -1,6 +1,13 @@
 spring:
   application:
     name: api
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/game?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Seoul}
+    username: ${DB_USERNAME:game}
+    password: ${DB_PASSWORD:game-local-pw}
+  sql:
+    init:
+      mode: always
   management:
     endpoints:
       web:

@@ -14,25 +14,42 @@ const rnd = n => Math.floor(Math.random() * n);
 let current = null;   // 현재 게임 키 (로비는 null)
 let app = null;       // <main id="app">
 
-let points = Number(localStorage.getItem('points') || START);
-if (!(points > 0)) points = START;
-
-// 게임별 누적 전적: { horse: {w, l, d, net}, ... }
-let stats = {};
-try { stats = JSON.parse(localStorage.getItem('stats') || '{}'); } catch (e) { stats = {}; }
+let points = START;
+let stats = {};       // 게임별 누적 전적: { horse: {w, l, d, net}, ... }
 
 function setPoints(v) {
     points = v;
-    localStorage.setItem('points', v);
     $('#pts').textContent = v;
 }
 
+// 서버(DB)가 돌려준 상태로 화면을 맞춘다.
+function applyState(st) {
+    stats = st.stats;
+    setPoints(st.points);
+    renderScore();
+}
+
+async function api(path, body) {
+    const res = await fetch('/api' + path, body === undefined ? {} : {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(path + ' ' + res.status);
+    return res.json();
+}
+
+// 결과를 DB에 저장하고, 서버가 계산한 포인트/전적으로 화면을 갱신한다.
+// 화면은 먼저 낙관적으로 갱신해서 반응이 즉시 보이게 한다.
 function record(game, outcome, delta) {
     const s = stats[game] || (stats[game] = {w: 0, l: 0, d: 0, net: 0});
     s[outcome]++;
     s.net += delta;
-    localStorage.setItem('stats', JSON.stringify(stats));
     renderScore();
+    return api('/result', {game, outcome, delta}).then(applyState).catch(e => {
+        console.error(e);
+        api('/state').then(applyState).catch(() => {});
+    });
 }
 
 function renderScore() {
@@ -59,8 +76,9 @@ function mount(key) {
         <main id="app"></main>`);
     app = $('#app');
     $('#home').onclick = () => { location.href = '/'; };
-    $('#reset').onclick = () => { setPoints(START); stats = {}; localStorage.removeItem('stats'); renderScore(); };
+    $('#reset').onclick = () => api('/reset', {}).then(applyState).catch(console.error);
     renderScore();
+    api('/state').then(applyState).catch(console.error);
 }
 
 // 베팅 UI: 금액 입력 + 검증. 유효하면 금액, 아니면 null

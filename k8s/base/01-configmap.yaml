@@ -5,4 +5,5 @@ metadata:
   namespace: app
 data:
   SPRING_PROFILES_ACTIVE: "local"
+  DB_URL: "jdbc:mysql://host.k3d.internal:3306/game?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Seoul"
   SERVER_PORT: "8080"
