@@ -57,14 +57,41 @@ curl http://localhost:8080/actuator/health
 | 순서 | 동작 |
 | --- | --- |
 | 1 | kubectl context를 `k3d-local-k8s`로 전환 |
-| 2 | `./gradlew clean bootJar` 로 api 빌드 |
-| 3 | `docker build -t api:1.0` 로 이미지 빌드 |
-| 4 | `k3d image import` 로 이미지를 클러스터에 import |
-| 5 | `kubectl apply -f k8s/base/` 로 매니페스트 적용 |
-| 6 | `rollout restart` 후 `rollout status` 로 완료 대기 |
-| 7 | Pod 목록 출력 |
+| 2 | `api/` 소스 해시를 계산해 현재 `api:1.0` 이미지의 `src.hash` 라벨과 비교. **같으면 3~5 건너뜀** |
+| 3 | `./gradlew clean bootJar` 로 api 빌드 |
+| 4 | `docker build -t api:1.0 --label src.hash=...` 로 이미지 빌드 후 **이전 이미지 삭제** |
+| 5 | `k3d image import` (새로 빌드했거나 노드에 `api:1.0`이 없을 때만) |
+| 6 | `kubectl apply -f k8s/base/` 로 매니페스트 적용 |
+| 7 | 새 이미지를 올렸을 때만 `rollout restart`, 이후 `rollout status` 로 완료 대기 |
+| 8 | Pod 목록 출력 |
 
-단계 하나라도 실패하면 즉시 중단됩니다.
+- 각 단계 소요 시간과 총 소요 시간이 함께 출력됩니다. 느릴 때 어느 단계가 병목인지 확인할 수 있습니다.
+- 같은 태그(`api:1.0`)로 재빌드하면 이전 이미지가 `<none>:<none>`(댕글링)으로 남아 디스크를 차지합니다. 스크립트가 이전 이미지를 지우므로 쌓이지 않습니다.
+- 단계 하나라도 실패하면 즉시 중단됩니다.
+
+## 트러블슈팅
+
+### `k3d image import` 실패 (`containerd.sock: connection refused`, `input/output error`)
+
+Docker Desktop VM의 디스크가 부족해 k3d 노드의 containerd가 죽은 경우입니다.
+
+1. 디스크 확인: `docker system df`, `docker run --rm alpine df -h /` (85% 이상이면 위험)
+2. 공간 확보: 안 쓰는 클러스터 삭제(`k3d cluster delete <이름>`), `docker image prune -a`, `docker builder prune`
+   - `docker volume prune`은 MySQL 데이터 볼륨까지 지울 수 있으니 확인 후 실행
+   - `docker image prune`(`-a` 없음)은 댕글링 이미지만 지우며, 레이어를 공유하면 확보되는 공간이 0일 수 있음
+3. 클러스터 재시작: `k3d cluster stop local-k8s && k3d cluster start local-k8s`
+4. 그래도 안 되면 Docker Desktop 재시작 또는 Settings → Resources에서 디스크 크기 확대
+
+### 클러스터 재시작 직후 api Pod가 재시작됨 (`UnknownHostException: host.k3d.internal`)
+
+재시작 직후 CoreDNS가 아직 준비되지 않아 호스트 MySQL(`host.k3d.internal`)을 찾지 못해서 생깁니다. CoreDNS가 올라오면 자동으로 정상화되므로 1~2분 기다리면 됩니다 (`kubectl -n kube-system get pods`로 확인).
+
+### 배포가 느림
+
+- Spring Boot 기동에 약 25초 걸립니다 (CPU limit 500m).
+- 롤링 업데이트가 `maxUnavailable: 0`이라 새 Pod가 Ready가 된 뒤 하나씩 교체합니다.
+- `gradlew clean bootJar`는 매번 처음부터 빌드합니다.
+- `deploy.sh`가 출력하는 단계별 시간으로 병목을 확인하세요.
 
 ## 게임장 (5AMSUNG)
 
